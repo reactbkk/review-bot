@@ -51,6 +51,7 @@ module.exports = function(ctx, cb) {
     log('Fetching pull request data')
     const pull = yield github.pullRequests.get({ owner, repo, number })
     const labels = yield github.issues.getIssueLabels({ owner, repo, number })
+    const statuses = yield github.repos.getStatuses({ owner, repo, ref: pull.data.head.sha })
     const poster = createPoster(number)
     const hasLabel = (name) => labels.data.filter(x => String(x.name) === String(name)).length > 0
     const reply = (text) => poster.say(`@${pull.data.user.login} ${text}`)
@@ -84,6 +85,26 @@ module.exports = function(ctx, cb) {
           ].join('\n'))
         }
       }
+      const status = getCIStatus(statuses)
+      if (status.state === 'success') {
+        log('State success')
+        if (hasLabel(BUILD_FAILED)) {
+          log('Remove label')
+          yield removeLabel(BUILD_FAILED)
+          reply('CI build passed now. Thank you!')
+        }
+      } else if (status.state === 'failure' || status.state === 'error') {
+        log('State ' + status.state)
+        if (!hasLabel(BUILD_FAILED)) {
+          log('Add label')
+          yield addLabel(BUILD_FAILED)
+          reply([
+            'Sorry, the CI build failed. We cannot merge your pull request if CI build is not passing.',
+            '',
+            `Please [check the CI build log](${status.target_url}) for more information.`
+          ].join('\n'))
+        }
+      }
     } finally {
       yield poster.post()
     }
@@ -91,6 +112,12 @@ module.exports = function(ctx, cb) {
 
   function containsIssueTag (text) {
     return /(close|improve)(s)?\s*#\d+|no( associated)? issue/i.test(text)
+  }
+
+  function getCIStatus (statuses) {
+    const found = statuses.data.filter(s => s.context === 'ci/circleci')[0]
+    if (!found) return { state: 'pending' }
+    return found
   }
 
   main().then(x => cb(null, x), e => cb(e))
