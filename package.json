@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "co": "^4.6.0",
+    "github": "^9.2.0"
+  },
+  "scripts": {
+    "deploy": "wt cron schedule --name reactbkkbot --secrets-file secrets 2m index.js"
+  }
+}
