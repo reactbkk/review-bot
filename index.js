@@ -76,7 +76,7 @@ module.exports = function(ctx, cb) {
           log('Add label')
           yield addLabel(ISSUE_TAG_MISSING)
           reply([
-            'Please **update the pull request description** to include an issue tag.',
+            'Please **update the pull request description** (not the title) to include an issue tag:',
             '',
             '- If this pull request solves an issue, say `Close #xx` where `xx` is the issue number.',
             '- If this pull request not associated with any issue, say `No associated issue`.',
