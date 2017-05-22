@@ -81,7 +81,7 @@ module.exports = function(ctx, cb) {
             '- If this pull request solves an issue, say `Close #xx` where `xx` is the issue number.',
             '- If this pull request not associated with any issue, say `No associated issue`.',
             '',
-            'Thank you.'
+            'Thank you. I will confirm with you again once the problem is fixed.'
           ].join('\n'))
         }
       }
