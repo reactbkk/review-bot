@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "axios": "^0.16.1",
     "co": "^4.6.0",
     "github": "^9.2.0"
   },

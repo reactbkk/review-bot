@@ -3,6 +3,12 @@
 module.exports = function(ctx, cb) {
   const GitHubApi = require('github')
   const co = require('co')
+  const gh4 = require('axios').create({
+    baseURL: 'https://api.github.com/',
+    headers: {
+      Authorization: `Bearer ${ctx.secrets.GH_TOKEN}`
+    }
+  })
 
   const github = new GitHubApi({
     headers: { "user-agent": "React Bangkok Review Bot" },
@@ -25,12 +31,55 @@ module.exports = function(ctx, cb) {
 
   function main () {
     return co(function* () {
-      const pulls = yield github.pullRequests.getAll({ owner: 'reactbkk', repo: '2.0.0' })
-      for (const pull of pulls.data) {
-        console.log(pull.number)
-        yield * checkPullRequest(pull.number)
-      }
+      // yield * checkOpenPullRequests()
+      yield * checkClosedPullRequests()
     })
+  }
+
+  function * checkOpenPullRequests () {
+    const pulls = yield github.pullRequests.getAll({ owner: 'reactbkk', repo: '2.0.0' })
+    for (const pull of pulls.data) {
+      console.log(pull.number)
+      yield * checkPullRequest(pull.number)
+    }
+  }
+
+  function * checkClosedPullRequests () {
+    const log = (text) => console.log(`[checkClosedPullRequests] ${text}`)
+    log('Loading data...')
+    const response = yield gh4.post('/graphql', {
+      query: `query {
+        repository (owner: "reactbkk", name: "2.0.0") {
+          applicationPendingPullRequests: pullRequests (
+            last: 50,
+            states: [MERGED],
+            labels: ["ticketing/application-pending"]
+          ) {
+            nodes {
+      				number
+              title
+              body
+              author { login }
+              comments (last: 10) {
+                nodes {
+                  author { login }
+                  body
+                }
+              }
+            }
+          }
+        }
+      }`
+    })
+    for (const pendingPr of response.data
+      .data
+      .repository
+      .applicationPendingPullRequests
+      .nodes
+    ) {
+      yield * checkPendingPR(pendingPr)
+    }
+    // console.log(JSON.stringify(response.data, null, 2))
   }
 
   function createPoster (number) {
@@ -102,27 +151,11 @@ module.exports = function(ctx, cb) {
           'Congratulations! Your PR has been merged. Please follow these steps to get your ticket.',
           '',
           '1. Fill in this [form](https://www.eventpop.me/events/1809-react-bangkok-2-0-0/application_forms/109/applicants/new?token=VV8VYR4HCNLNYNDU).',
-          '2. Add reference code to this PR description.',
+          '2. Post a comment with your reference code in this pull request.',
           '3. Wait for invitation email from Event Pop and follow the instruction from the email.',
           '',
           'Thank you for your contribution. See you in the event!'
         ].join('\n'))
-      }
-      if (pull.data.merged) {
-        log('Merged')
-        if (!hasLabel(TICKET_ISSUED) && !hasLabel(TICKET_ISSUE_PENDING)) {
-          log('Actions could be made')
-          if (hasLabel(TICKET_APPLICATION_PENDING) && getEventPopApplication(pull.data.body)) {
-            log('Received application number')
-            yield removeLabel(TICKET_APPLICATION_PENDING)
-            yield addLabel(TICKET_ISSUE_PENDING)
-            reply([
-              'Your Event Pop application number have been received.',
-              ''
-              `@PanJ Please approve application #${getEventPopApplication(pull.data.body)}.`
-            ].join('\n'))
-          }
-        }
       }
       const status = getCIStatus(statuses)
       if (status.state === 'success') {
@@ -143,6 +176,45 @@ module.exports = function(ctx, cb) {
             `Please [check the CI build log](${status.target_url}) for more information.`
           ].join('\n'))
         }
+      }
+    } finally {
+      yield poster.post()
+    }
+  }
+
+  function * checkPendingPR (pendingPr) {
+    const number = pendingPr.number
+    const log = (text) => console.log(`[${number}] ${text}`)
+    const poster = createPoster(number)
+    const reply = (text) => poster.say(`@${pull.data.user.login} ${text}`)
+    const addLabel = (name) => {
+      return github.issues.addLabels({ owner, repo, number, labels: [ name ] })
+    }
+    const removeLabel = (name) => {
+      return github.issues.removeLabel({ owner, repo, number, name })
+    }
+    try {
+      const userText = [
+        pendingPr.body,
+        ...pendingPr.comments.nodes
+          .filter(comment => comment.author.login === pendingPr.author.login)
+          .map(comment => comment.body)
+      ].join('\n')
+      const match = userText.match(/#([A-Z0-9]{8})/)
+      if (match) {
+        const applicationNumber = match[1]
+        log('Ticket code found')
+        yield removeLabel(TICKET_APPLICATION_PENDING)
+        yield addLabel(TICKET_ISSUE_PENDING)
+        const newTitle = `[Application #${applicationNumber}] ${pendingPr.title}`
+        yield github.pullRequests.update({ owner, repo, number, title: newTitle })
+        reply([
+          'Your Event Pop application number have been received.',
+          '',
+          `@PanJ Please approve application #${applicationNumber}.`
+        ].join('\n'))
+      } else {
+        log('Ticket code still not found')
       }
     } finally {
       yield poster.post()
