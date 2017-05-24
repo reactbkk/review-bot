@@ -196,10 +196,11 @@ module.exports = function(ctx, cb) {
     try {
       const userText = [
         pendingPr.body,
-        ...pendingPr.comments.nodes
+      ].concat(
+        pendingPr.comments.nodes
           .filter(comment => comment.author.login === pendingPr.author.login)
           .map(comment => comment.body)
-      ].join('\n')
+      ).join('\n')
       const match = userText.match(/#([A-Z0-9]{8})/)
       if (match) {
         const applicationNumber = match[1]
