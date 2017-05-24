@@ -16,6 +16,9 @@ module.exports = function(ctx, cb) {
 
   const BUILD_FAILED = '✖︎ Build failed'
   const ISSUE_TAG_MISSING = '✖︎ Issue tag missing'
+  const TICKET_ISSUED = 'ticketing/issued'
+  const TICKET_APPLICATION_PENDING = 'ticketing/application-pending'
+  const TICKET_ISSUE_PENDING = 'ticketing/issue-pending'
   const owner = 'reactbkk'
   const repo = '2.0.0'
 
@@ -85,6 +88,35 @@ module.exports = function(ctx, cb) {
           ].join('\n'))
         }
       }
+      if (pull.data.merged) {
+        log('Merged')
+        if (!hasLabel(TICKET_ISSUED) && !hasLabel(TICKET_ISSUE_PENDING)) {
+          log('Actions could be made')
+          if (hasLabel(TICKET_APPLICATION_PENDING) && getEventPopApplication(pull.data.body)) {
+            log('Received application number')
+            yield removeLabel(TICKET_APPLICATION_PENDING)
+            yield addLabel(TICKET_ISSUE_PENDING)
+            reply([
+              'Your Event Pop application number have been received.',
+              ''
+              `@PanJ Please approve application #${getEventPopApplication(pull.data.body)}.`
+            ].join('\n'))
+          }
+          if (!hasLabel(TICKET_APPLICATION_PENDING)) {
+            log('Just merged')
+            yield addLabel(TICKET_APPLICATION_PENDING)
+            reply([
+              'Congratulations! Your PR has been merged. Please follow these steps to get your ticket.',
+              '',
+              '1. Fill in this [form](https://www.eventpop.me/events/1809-react-bangkok-2-0-0/application_forms/109/applicants/new?token=VV8VYR4HCNLNYNDU).',
+              '2. Add reference code to this PR description.',
+              '3. Wait for invitation email from Event Pop and follow the instruction from the email.',
+              '',
+              'Thank you for your contribution. See you in the event!'
+            ].join('\n'))
+          }
+        }
+      }
       const status = getCIStatus(statuses)
       if (status.state === 'success') {
         log('State success')
@@ -112,6 +144,12 @@ module.exports = function(ctx, cb) {
 
   function containsIssueTag (text) {
     return /(close|improve)(s)?\s*#\d+|no( associated)? issue/i.test(text)
+  }
+
+  function getEventPopApplication (text) {
+    const match = text.match(/application ?#([a-z0-9]{8})/i);
+    if (!match) return false;
+    return match[1];
   }
 
   function getCIStatus (statuses) {
