@@ -16,6 +16,7 @@ module.exports = function(ctx, cb) {
 
   const BUILD_FAILED = '✖︎ Build failed'
   const ISSUE_TAG_MISSING = '✖︎ Issue tag missing'
+  const READY_TO_MERGE = '✔︎ Ready to merge'
   const TICKET_ISSUED = 'ticketing/issued'
   const TICKET_APPLICATION_PENDING = 'ticketing/application-pending'
   const TICKET_ISSUE_PENDING = 'ticketing/issue-pending'
@@ -64,6 +65,9 @@ module.exports = function(ctx, cb) {
     const removeLabel = (name) => {
       return github.issues.removeLabel({ owner, repo, number, name })
     }
+    const mergePullRequest = () => {
+      return github.pullRequests.merge({ owner, repo, number })
+    }
 
     try {
       if (containsIssueTag(pull.data.body)) {
@@ -88,6 +92,22 @@ module.exports = function(ctx, cb) {
           ].join('\n'))
         }
       }
+      if (hasLabel(READY_TO_MERGE)) {
+        log('PR ready to merge')
+        yield removeLabel(READY_TO_MERGE)
+        yield mergePullRequest()
+        log('Just merged')
+        yield addLabel(TICKET_APPLICATION_PENDING)
+        reply([
+          'Congratulations! Your PR has been merged. Please follow these steps to get your ticket.',
+          '',
+          '1. Fill in this [form](https://www.eventpop.me/events/1809-react-bangkok-2-0-0/application_forms/109/applicants/new?token=VV8VYR4HCNLNYNDU).',
+          '2. Add reference code to this PR description.',
+          '3. Wait for invitation email from Event Pop and follow the instruction from the email.',
+          '',
+          'Thank you for your contribution. See you in the event!'
+        ].join('\n'))
+      }
       if (pull.data.merged) {
         log('Merged')
         if (!hasLabel(TICKET_ISSUED) && !hasLabel(TICKET_ISSUE_PENDING)) {
@@ -100,19 +120,6 @@ module.exports = function(ctx, cb) {
               'Your Event Pop application number have been received.',
               ''
               `@PanJ Please approve application #${getEventPopApplication(pull.data.body)}.`
-            ].join('\n'))
-          }
-          if (!hasLabel(TICKET_APPLICATION_PENDING)) {
-            log('Just merged')
-            yield addLabel(TICKET_APPLICATION_PENDING)
-            reply([
-              'Congratulations! Your PR has been merged. Please follow these steps to get your ticket.',
-              '',
-              '1. Fill in this [form](https://www.eventpop.me/events/1809-react-bangkok-2-0-0/application_forms/109/applicants/new?token=VV8VYR4HCNLNYNDU).',
-              '2. Add reference code to this PR description.',
-              '3. Wait for invitation email from Event Pop and follow the instruction from the email.',
-              '',
-              'Thank you for your contribution. See you in the event!'
             ].join('\n'))
           }
         }
