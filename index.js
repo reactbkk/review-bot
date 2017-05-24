@@ -31,7 +31,7 @@ module.exports = function(ctx, cb) {
 
   function main () {
     return co(function* () {
-      // yield * checkOpenPullRequests()
+      yield * checkOpenPullRequests()
       yield * checkClosedPullRequests()
     })
   }
