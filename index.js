@@ -151,7 +151,7 @@ module.exports = function(ctx, cb) {
           'Congratulations! Your PR has been merged. Please follow these steps to get your ticket.',
           '',
           '1. Fill in this [form](https://www.eventpop.me/events/1809-react-bangkok-2-0-0/application_forms/109/applicants/new?token=VV8VYR4HCNLNYNDU).',
-          '2. Post a comment with your reference code in this pull request. (Must prefix with the word `appication` e.g. `application #XXXXXXXX`)',
+          '2. Post a comment with your reference code in this pull request. (e.g. `#XXXXXXXX`)',
           '3. Wait for invitation email from Event Pop and follow the instruction from the email.',
           '',
           'Thank you for your contribution. See you in the event!'
